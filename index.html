@@ -10,8 +10,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap">
 <script>
-  // hidden "before reveal" states only apply when motion is allowed
-  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('anim');
+  // animations run for everyone, even with the OS "reduce motion" setting on (studio's choice)
+  document.documentElement.classList.add('anim');
 </script>
 <style>
 /* Layout: one dark vertical scroll, 9 blocks; block 2 is the single loud screen (orange→yellow gradient, black cards). */
@@ -224,6 +224,11 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 .card::before { content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0; transition: opacity .35s;
   background: radial-gradient(320px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 106, 0, .28), transparent 65%); }
 @media (hover: hover) { .card:hover { transform: translateY(-6px); box-shadow: 0 24px 48px rgba(11, 11, 11, .4), 0 0 32px rgba(255, 194, 26, .55); } .card:hover::before { opacity: 1; } }
+/* touch screens: the card in the middle of the screen gets the desktop hover look */
+@media (hover: none) {
+  .card.is-lit { transform: translateY(-6px); box-shadow: 0 24px 48px rgba(11, 11, 11, .4), 0 0 32px rgba(255, 194, 26, .55); }
+  .card.is-lit::before { opacity: 1; }
+}
 @media (min-width: 1024px) { .card { padding: 44px 40px; min-height: 320px; } }
 .card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
 .card-mark { font: 900 88px/.8 var(--font-display); background: var(--gradient); -webkit-background-clip: text; background-clip: text; color: transparent; }
@@ -425,11 +430,6 @@ button.swipe:active .ico { translate: 10px 0; }
 .map iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; filter: grayscale(1) invert(.92) contrast(.9); }
 .copy { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
 
-/* ---------- motion preferences ---------- */
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
-  *, *::before, *::after { animation: none !important; transition: none !important; }
-}
 </style>
 </head>
 <body>
@@ -534,7 +534,7 @@ const TICKER = ['Очный интенсив', '15 дней', '7 мастеро�
 /* ========================================================================== */
 const { useState, useEffect, useRef, Fragment } = React;
 const html = htm.bind(React.createElement);
-const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const REDUCED = false; // the OS "reduce motion" setting is deliberately ignored, see <head>
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 
@@ -901,7 +901,12 @@ function useScrollFx() {
     const go = new IntersectionObserver(es => es.forEach(e => e.target.classList.toggle('is-center', e.isIntersecting && innerWidth < 768)),
       { rootMargin: '0px -49% 0px -49%' });
     $$('#studio .gallery > .ph').forEach(p => go.observe(p));
-    return () => { removeEventListener('scroll', onScroll); removeEventListener('resize', onScroll); mo.disconnect(); go.disconnect(); };
+    // why-us cards on touch screens: light up the card passing through the middle of the screen
+    const touch = matchMedia('(hover: none)');
+    const co = new IntersectionObserver(es => es.forEach(e => e.target.classList.toggle('is-lit', e.isIntersecting && touch.matches)),
+      { rootMargin: '-40% 0px -40% 0px' });
+    $$('#why .card').forEach(c => co.observe(c));
+    return () => { removeEventListener('scroll', onScroll); removeEventListener('resize', onScroll); mo.disconnect(); go.disconnect(); co.disconnect(); };
   }, []);
 }
 
